@@ -271,6 +271,7 @@ public class ChatBot {
         return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n");
     }
 
+    // Calls this method is the API key is not working (back-up option)
     private static String localHeuristicFeedback(String question, String ans) {
         // Simple, local heuristic feedback for when LLM is unavailable
         if (ans == null || ans.trim().isEmpty()) return "You left this blank. Try to provide a concise STAR example next time.";
