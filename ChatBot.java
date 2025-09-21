@@ -1,225 +1,131 @@
 import java.util.*;
 import java.io.*;
 import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
+import java.net.http.*;
 
-/*
- * ChatBot
- * - Simple CLI interview practice tool.
- * - Prompts user to choose a category, asks questions, collects answers,
- *   and provides feedback (LLM if API key present, otherwise heuristic).
- */
 public class ChatBot {
-    // === I/O & Constants ===
-    private static final Scanner scanner = new Scanner(System.in);
-    private static final int QUESTIONS_PER_SESSION = 5;
+    private static final Scanner sc = new Scanner(System.in);
+    private static final int Q_COUNT = 5;
 
     public static void main(String[] args) {
         System.out.println("Welcome to the Interview Practice ChatBot!");
-
-        // Always prompt the user for the interview category (do not read from args)
-        String category = chooseCategory();
-        System.out.println("You selected: " + category);
-
-        // Start one practice session for the selected category
-        runSession(category);
+        String cat = chooseCategory();
+        runSession(cat);
     }
 
-    // Run a single practice session end-to-end for a category
-    private static void runSession(String category) {
-        // --- Prepare questions and collect answers ---
-        List<String> questions = getQuestionsForCategory(category);
-        List<String> answers = askQuestions(questions);
+    private static void runSession(String cat) {
+        List<String> qs = getQuestions(cat);
+        List<String> ans = ask(qs);
+        String criteria = getCriteria(cat);
 
-        // --- Generate evaluation criteria and feedback ---
-        String criteria = generateCriteria(category, questions);
-        List<String> feedback = generateFeedback(criteria, questions, answers);
+        System.out.println("\n--- Evaluation Criteria ---\n" + criteria);
+        System.out.println("\n--- Feedback ---");
 
-        System.out.println("\n--- Evaluation Criteria ---");
-        System.out.println(criteria);
-
-        System.out.println("\n--- Feedback On Your Answers ---");
-        for (int i = 0; i < questions.size(); i++) {
-            System.out.println("Q" + (i + 1) + ": " + questions.get(i));
-            System.out.println("A: " + answers.get(i));
-            System.out.println(feedback.get(i));
+        for (int i = 0; i < qs.size(); i++) {
+            System.out.println("Q" + (i + 1) + ": " + qs.get(i));
+            System.out.println("A: " + ans.get(i));
+            System.out.println(getFeedback(criteria, qs.get(i), ans.get(i)));
             System.out.println();
         }
-
-        System.out.println("Practice session complete. You can re-run the program to try a different category.");
     }
 
     private static String chooseCategory() {
-        // Prompt the user to select one of three categories
-        System.out.println("Which interview would you like to prepare for? (enter number)");
-        System.out.println("1) HR");
-        System.out.println("2) Technical");
-        System.out.println("3) Interpersonal (Behavioral)");
-
+        System.out.println("Pick a category:\n1) HR\n2) Technical\n3) Interpersonal");
         while (true) {
             System.out.print("Choice: ");
-            String input;
-            if (scanner.hasNextLine()) {
-                input = scanner.nextLine().trim();
-            } else {
-                System.out.println();
-                System.out.println("No input detected — defaulting to 'Technical'.");
-                return "Technical";
-            }
-            switch (input) {
-                case "1":
-                case "HR":
-                case "hr":
-                    return "HR";
-                case "2":
-                case "Technical":
-                case "technical":
-                    return "Technical";
-                case "3":
-                case "Interpersonal":
-                case "interpersonal":
-                case "Behavioral":
-                case "behavioral":
-                    return "Interpersonal";
-                default:
-                    System.out.println("Invalid choice. Please enter 1, 2, or 3.");
+            String in = sc.hasNextLine() ? sc.nextLine().trim() : "";
+            switch (in) {
+                case "1": case "HR": return "HR";
+                case "2": case "Technical": return "Technical";
+                case "3": case "Interpersonal": return "Interpersonal";
+                default: System.out.println("Invalid. Try 1, 2, or 3.");
             }
         }
     }
 
-    private static List<String> getQuestionsForCategory(String category) {
-        // Return a small fixed list of 5 questions depending on the category
-        List<String> qs = new ArrayList<>();
-        switch (category) {
-            case "HR":
-                qs.add("Tell me about yourself and your background.");
-                qs.add("Why do you want to work for our company?");
-                qs.add("What are your strengths and weaknesses?");
-                qs.add("Tell us about a time you received constructive criticism.");
-                qs.add("Where do you see yourself in 5 years?");
-                break;
-            case "Technical":
-                qs.add("Explain a challenging technical problem you solved.");
-                qs.add("Describe the architecture of a project you built.");
-                qs.add("How do you approach debugging a complex issue?");
-                qs.add("Which data structures would you use for X (explain why)?");
-                qs.add("How do you ensure code quality and testing?");
-                break;
-            case "Interpersonal":
-                qs.add("Describe a conflict you had with a coworker and how you resolved it.");
-                qs.add("Tell me about a time you led a team under pressure.");
-                qs.add("Give an example of when you had to persuade someone to accept your idea.");
-                qs.add("How do you handle feedback that you disagree with?");
-                qs.add("Tell me about a time you helped a colleague improve.");
-                break;
-            default:
-                qs.add("Tell me about yourself.");
-                qs.add("Why this company?");
-                qs.add("Strengths and weaknesses?");
-                qs.add("Describe a past challenge.");
-                qs.add("Where in 5 years?");
+    private static List<String> getQuestions(String cat) {
+        switch (cat) {
+            case "HR": return Arrays.asList(
+                "Tell me about yourself.",
+                "Why do you want this job?",
+                "Strengths and weaknesses?",
+                "Time you got criticism?",
+                "Where in 5 years?");
+            case "Technical": return Arrays.asList(
+                "Challenging problem you solved?",
+                "Describe a system you built.",
+                "Debugging approach?",
+                "Which data structures and why?",
+                "How do you ensure code quality?");
+            default: return Arrays.asList(
+                "Conflict with coworker?",
+                "Leading a team under pressure?",
+                "Persuading someone?",
+                "Handling feedback you disagree with?",
+                "Helping a colleague improve?");
         }
-        return qs;
     }
 
-    private static List<String> askQuestions(List<String> questions) {
-        // Ask each question via console and collect user answers
-        List<String> answers = new ArrayList<>();
-        System.out.println("\nI will ask " + QUESTIONS_PER_SESSION + " questions. Please answer each one (press Enter when done).\n");
-        for (int i = 0; i < questions.size(); i++) {
-            System.out.println();
-            System.out.println("Question " + (i + 1) + ": " + questions.get(i));
+    private static List<String> ask(List<String> qs) {
+        List<String> ans = new ArrayList<>();
+        for (int i = 0; i < Q_COUNT; i++) {
+            System.out.println("\nQ" + (i + 1) + ": " + qs.get(i));
             System.out.print("Your answer: ");
-            String ans;
-            if (scanner.hasNextLine()) {
-                ans = scanner.nextLine().trim();
-            } else {
-                System.out.println();
-                ans = "";
-            }
-            if (ans.isEmpty()) {
-                System.out.println("(You submitted an empty answer; you can enter a short response next time.)");
-            }
-            answers.add(ans);
+            String a = sc.hasNextLine() ? sc.nextLine().trim() : "";
+            ans.add(a.isEmpty() ? "(blank)" : a);
         }
-        return answers;
+        return ans;
     }
 
-    private static String generateCriteria(String category, List<String> questions) {
-        // Build a human-readable set of evaluation criteria for the session
-        StringBuilder sb = new StringBuilder();
-        sb.append("Category: ").append(category).append("\n");
-        sb.append("General evaluation criteria:\n");
-        sb.append("- Clarity and structure of response (use of STAR: Situation, Task, Action, Result).\n");
-        sb.append("- Relevance to the question and role.\n");
-        sb.append("- Specific examples and measurable outcomes.\n");
-        sb.append("- Professional tone and confidence.\n");
-        if (category.equals("Technical")) {
-            sb.append("- Technical depth and correctness; mention trade-offs.\n");
-            sb.append("- Understanding of architecture, algorithms, and testing.\n");
-        } else if (category.equals("HR")) {
-            sb.append("- Cultural fit and motivation; alignment with company values.\n");
-        } else if (category.equals("Interpersonal")) {
-            sb.append("- Emotional intelligence, collaboration, and learning.\n");
+    private static String getCriteria(String cat) {
+        String base = "- Clear, structured STAR answers\n- Relevant, specific, professional\n";
+        switch (cat) {
+            case "Technical": return base + "- Technical depth & trade-offs\n- Testing & architecture\n";
+            case "HR": return base + "- Motivation & cultural fit\n";
+            default: return base + "- Collaboration & emotional intelligence\n";
         }
-        return sb.toString();
     }
 
-    private static List<String> generateFeedback(String criteria, List<String> questions, List<String> answers) {
-        // Generate feedback for each answer. If an OpenAI API key is provided
-        // via the OPENAI_API_KEY environment variable, attempt an LLM call.
-        List<String> feedback = new ArrayList<>();
-        String apiKey = System.getenv("OPENAI_API_KEY");
-        boolean hasApiKey = apiKey != null && !apiKey.isBlank();
-
-        for (int i = 0; i < questions.size(); i++) {
-            String ans = answers.get(i);
-            if (ans == null || ans.trim().isEmpty()) {
-                feedback.add("You left this answer blank. Try to give a short structured response using an example.");
-                continue;
+    private static String getFeedback(String criteria, String q, String a) {
+        String key = System.getenv("OPENAI_API_KEY");
+        if (a.equals("(blank)")) return "You left this blank. Try STAR format.";
+        if (key != null && !key.isBlank()) {
+            try {
+                return callOpenAIForFeedback(key, buildPrompt(criteria, q, a));
+            } catch (Exception e) {
+                return "(LLM failed: " + e.getMessage() + ")\n" + localFeedback(a);
             }
-
-            if (hasApiKey) {
-                String prompt = buildPrompt(criteria, questions.get(i), ans);
-                try {
-                    String modelFeedback = callOpenAIForFeedback(apiKey, prompt);
-                    feedback.add(modelFeedback);
-                    continue;
-                } catch (Exception e) {
-                    feedback.add("(LLM call failed: " + e.getMessage() + ") " + localHeuristicFeedback(questions.get(i), ans));
-                    continue;
-                }
-            }
-
-            feedback.add(localHeuristicFeedback(questions.get(i), ans));
         }
-        return feedback;
+        return localFeedback(a);
     }
 
-    private static String buildPrompt(String criteria, String question, String answer) {
-        // Build a concise instruction prompt to send to an LLM.
-        // The prompt requests specific labeled sections to make parsing deterministic.
-        StringBuilder p = new StringBuilder();
-        p.append("You are an expert interview coach. Evaluate the candidate's answer below according to the provided criteria. Return only the following labeled plain-text sections (NO JSON):\n");
-        p.append("- CRITIQUE: 1-3 short sentences about strengths and weaknesses.\n");
-        p.append("- SUGGESTIONS: 2-4 specific suggestions each starting with '- '.\n");
-        p.append("- TIPS: 1-3 short tactical tips in bullets.\n");
-        p.append("CRITIQUE:, SUGGESTIONS:, TIPS:.\n");
-        // p.append("Only include those labeled sections; avoid extra preamble.\n");
-        p.append("Criteria:\n");
-        p.append(criteria).append("\n");
-        p.append("Question: ").append(question).append("\n");
-        p.append("Candidate Answer: ").append(answer).append("\n");
-        return p.toString();
+    private static String buildPrompt(String crit, String q, String a) {
+        return "You are an interview coach. Evaluate answer per criteria.\n"
+            + "CRITIQUE (1-3 sentences)\nSUGGESTIONS (bullets)\nTIPS (bullets)\n"
+            + "Criteria:\n" + crit + "\nQ: " + q + "\nA: " + a;
     }
 
+    // === Keep this method unchanged ===
     private static String callOpenAIForFeedback(String apiKey, String prompt) throws Exception {
-        // Make a minimal Chat Completions API call and return the assistant's text.
         HttpClient client = HttpClient.newHttpClient();
+        String model = "gpt-3.5-turbo";
+        double temperature = 0.7;
+        int maxTokens = 200;
+        double topP = 1.0;
+        double frequencyPenalty = 0.0;
+        double presencePenalty = 0.6;
+        String stopSeq = "\"Q:\"";
 
-        String jsonBody = "{\"model\":\"gpt-3.5-turbo\",\"messages\":[{\"role\":\"user\",\"content\":\"" + escapeJson(prompt) + "\"}],\"max_tokens\":350}";
+        String jsonBody = "{"
+            + "\"model\":\"" + model + "\","
+            + "\"messages\":[{\"role\":\"user\",\"content\":\"" + escapeJson(prompt) + "\"}],"
+            + "\"temperature\":" + temperature + ","
+            + "\"max_tokens\":" + maxTokens + ","
+            + "\"top_p\":" + topP + ","
+            + "\"frequency_penalty\":" + frequencyPenalty + ","
+            + "\"presence_penalty\":" + presencePenalty + ","
+            + "\"stop\":[" + stopSeq + "]"
+            + "}";
 
         HttpRequest request = HttpRequest.newBuilder()
             .uri(URI.create("https://api.openai.com/v1/chat/completions"))
@@ -231,61 +137,33 @@ public class ChatBot {
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
         String body = response.body();
 
-        // Extract the assistant's reply from the returned JSON (simple parser below)
         String assistantText = extractAssistantContent(body);
         if (assistantText == null || assistantText.isBlank()) {
-            throw new IOException("No assistant content found in response; status=" + response.statusCode());
+            throw new IOException("No assistant content found; status=" + response.statusCode());
         }
         return assistantText.trim();
     }
 
     private static String extractAssistantContent(String json) {
-        // Lightweight extraction of the first "content":"..." value.
-        // Note: this is not a full JSON parser but works for the expected API shape.
-        if (json == null) return null;
         String key = "\"content\":\"";
         int idx = json.indexOf(key);
         if (idx < 0) return null;
-        int start = idx + key.length();
-        int i = start;
+        int start = idx + key.length(), i = start;
         while (i < json.length()) {
             char c = json.charAt(i);
-            if (c == '"') {
-                // count preceding backslashes
-                int back = 0; int j = i - 1;
-                while (j >= start && json.charAt(j) == '\\') { back++; j--; }
-                if (back % 2 == 0) break; // not escaped
-            }
+            if (c == '"' && (i == 0 || json.charAt(i - 1) != '\\')) break;
             i++;
         }
-        if (i >= json.length()) return null;
         String raw = json.substring(start, i);
-        // Unescape common sequences for readability
-        String unescaped = raw.replaceAll("\\\\n", "\n").replaceAll("\\\\r", "\r").replaceAll("\\\"", "\"").replaceAll("\\\\\\\\", "\\");
-        return unescaped;
+        return raw.replaceAll("\\\\n", "\n").replaceAll("\\\\\"", "\"");
     }
 
     private static String escapeJson(String s) {
-        // Escape backslashes, quotes and newlines for embedding in JSON
-        if (s == null) return "";
         return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n");
     }
 
-    // Calls this method is the API key is not working (back-up option)
-    private static String localHeuristicFeedback(String question, String ans) {
-        // Simple, local heuristic feedback for when LLM is unavailable
-        if (ans == null || ans.trim().isEmpty()) return "You left this blank. Try to provide a concise STAR example next time.";
-        StringBuilder sb = new StringBuilder();
-        sb.append("CRITIQUE:\n");
-        sb.append("- ");
-        sb.append(ans.length() < 40 ? "Answer is brief and lacks specifics." : "Answer contains some specifics but could be more outcome-focused.");
-        sb.append("\n");
-        sb.append("SUGGESTIONS:\n");
-        sb.append("- Use STAR: clearly state Situation and Task early.\n");
-        sb.append("- Quantify results when possible (numbers, % improvements).\n");
-        sb.append("TIPS:\n");
-        sb.append("- Keep it under 2 minutes when speaking.\n");
-        // Note: numeric SCORES and CONFIDENCE fields were removed per user request
-        return sb.toString();
+    private static String localFeedback(String a) {
+        return "CRITIQUE: " + (a.length() < 40 ? "Too brief." : "Good, but could be sharper.") + "\n"
+            + "SUGGESTIONS:\n- Use STAR\n- Quantify results\nTIPS:\n- Keep under 2 minutes";
     }
 }
